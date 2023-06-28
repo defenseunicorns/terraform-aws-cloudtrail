@@ -82,7 +82,7 @@ resource "aws_kms_alias" "default" {
 
 module "cloudtrail" {
   source                 = "../.."
-  name                   = var.name
+  name                   = "!foo" #var.name
   kms_key_id             = aws_kms_key.default.id
   use_external_s3_bucket = var.use_external_s3_bucket
   s3_bucket_name         = var.s3_bucket_name
