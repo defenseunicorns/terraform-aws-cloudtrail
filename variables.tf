@@ -3,12 +3,12 @@ variable "name" {
   type        = string
 
   validation {
-    condition     = try(regex("^[[:alnum:]]{1}[A-Za-z0-9-._]+[A-Za-z0-9]$", var.name), false) != false # If this regex fails, the outcome will be false. Any result but false will pass validation. 
+    condition     = try(regex("^[[:alnum:]]{1}[A-Za-z0-9-._]+[A-Za-z0-9]$", var.name), false) != false # If this regex fails, the outcome will be false. Any result but false will pass validation.
     error_message = "CloudTrail name is invalid. Please see the CloudTrail naming requirements: https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-trail-naming-requirements.html"
   }
 
   validation {
-    condition     = try(regex("[._-]{2,}", var.name), false) == false # If this regex fails, the outcome will be false. Only results that equal false will fail validation.  
+    condition     = try(regex("[._-]{2,}", var.name), false) == false # If this regex fails, the outcome will be false. Only results that equal false will fail validation.
     error_message = "CloudTrail name is invalid. Please see the CloudTrail naming requirements: https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-trail-naming-requirements.html"
   }
 }
