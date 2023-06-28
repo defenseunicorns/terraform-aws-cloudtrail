@@ -1,5 +1,5 @@
 variable "name" {
-  description = "Name of the trail"
+  description = "Name of the trail."
   type        = string
 
   validation {
