@@ -1,6 +1,6 @@
 # terraform-aws-cloudtrail
 
-Terraform module to provision a [CloudTrail](https://aws.amazon.com/cloudtrail/) on AWS.
+Terraform module to provision [CloudTrail](https://aws.amazon.com/cloudtrail/) on AWS.
 
 ## Notes
 
