@@ -19,6 +19,18 @@ resource "aws_s3_bucket" "this" {
   }
 }
 
+resource "aws_s3_bucket_public_access_block" "this" {
+  count                   = var.use_external_s3_bucket ? 0 : 1
+  bucket                  = aws_s3_bucket.this[0].id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+  depends_on = [
+    aws_s3_bucket.this
+  ]
+}
+
 data "aws_iam_policy_document" "this" {
   count = var.use_external_s3_bucket ? 0 : 1
   statement {
@@ -70,6 +82,10 @@ resource "aws_s3_bucket_policy" "this" {
   count  = var.use_external_s3_bucket ? 0 : 1
   bucket = aws_s3_bucket.this[0].id
   policy = data.aws_iam_policy_document.this[0].json
+  depends_on = [
+    aws_s3_bucket.this,
+    aws_s3_bucket_public_access_block.this
+  ]
 }
 
 resource "aws_s3_bucket_versioning" "this" {
@@ -89,15 +105,6 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
       sse_algorithm     = "aws:kms"
     }
   }
-}
-
-resource "aws_s3_bucket_public_access_block" "this" {
-  count                   = var.use_external_s3_bucket ? 0 : 1
-  bucket                  = aws_s3_bucket.this[0].id
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "this" {
