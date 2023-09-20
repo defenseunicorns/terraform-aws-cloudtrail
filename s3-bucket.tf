@@ -26,9 +26,6 @@ resource "aws_s3_bucket_public_access_block" "this" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
-  depends_on = [
-    aws_s3_bucket.this
-  ]
 }
 
 data "aws_iam_policy_document" "this" {
@@ -93,23 +90,6 @@ resource "aws_s3_bucket_versioning" "this" {
   versioning_configuration {
     status = "Enabled"
   }
-  depends_on = [
-    aws_s3_bucket_policy.this
-  ]
-}
-
-resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
-  count  = var.use_external_s3_bucket ? 0 : 1
-  bucket = aws_s3_bucket.this[0].id
-  rule {
-    apply_server_side_encryption_by_default {
-      kms_master_key_id = data.aws_kms_key.this.id
-      sse_algorithm     = "aws:kms"
-    }
-  }
-  depends_on = [
-    aws_s3_bucket_versioning.this
-  ]
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "this" {
@@ -129,7 +109,19 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
       days_after_initiation = 7
     }
   }
+  # Must have bucket versioning enabled first
   depends_on = [
-    aws_s3_bucket_server_side_encryption_configuration.this
+    aws_s3_bucket_versioning.this
   ]
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
+  count  = var.use_external_s3_bucket ? 0 : 1
+  bucket = aws_s3_bucket.this[0].id
+  rule {
+    apply_server_side_encryption_by_default {
+      kms_master_key_id = data.aws_kms_key.this.id
+      sse_algorithm     = "aws:kms"
+    }
+  }
 }
