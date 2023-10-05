@@ -2,7 +2,7 @@ module github.com/defenseunicorns/terraform-aws-uds-cloudtrail
 
 go 1.21.1
 
-require github.com/gruntwork-io/terratest v0.44.0
+require github.com/gruntwork-io/terratest v0.45.0
 
 require (
 	cloud.google.com/go v0.107.0 // indirect
