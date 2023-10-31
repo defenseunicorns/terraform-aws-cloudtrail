@@ -2,7 +2,7 @@ package e2e_test
 
 import (
 	"context"
-	"github.com/defenseunicorns/terraform-aws-uds-cloudtrail/test/e2e/utils"
+	"github.com/defenseunicorns/terraform-aws-cloudtrail/test/e2e/utils"
 	"os"
 	"testing"
 	"time"
