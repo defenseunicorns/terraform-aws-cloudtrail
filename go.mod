@@ -1,4 +1,4 @@
-module github.com/defenseunicorns/terraform-aws-uds-cloudtrail
+module github.com/defenseunicorns/terraform-aws-cloudtrail
 
 go 1.21.1
 
