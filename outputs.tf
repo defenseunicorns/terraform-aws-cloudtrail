@@ -1,15 +1,14 @@
-output "bucket_id" {
-  value = aws_s3_bucket.this[*].id
+output "cloudtrail_arn" {
+  value       = aws_cloudtrail.this.arn
+  description = "ARN of the cloudtrail"
 }
 
-output "trail_arn" {
-  value = aws_cloudtrail.this.arn
+output "cloudtrail_home_region" {
+  value       = aws_cloudtrail.this.home_region
+  description = "The region in which the cloudtrail was created"
 }
 
-output "trail_home_region" {
-  value = aws_cloudtrail.this.home_region
-}
-
-output "trail_id" {
-  value = aws_cloudtrail.this.id
+output "cloudtrail_id" {
+  value       = aws_cloudtrail.this.id
+  description = "The name of the cloudtrail"
 }
