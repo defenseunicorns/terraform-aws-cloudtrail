@@ -2,12 +2,6 @@
 # General
 ################################################################################
 #region
-locals {
-  s3_bucket_prefix                         = "${var.name}-cloudtrail"
-  cloudtrail_cloudwatch_role_name_prefix   = "${var.name}-cloudtrail-to-cloudwatch"
-  cloudtrail_cloudwatch_policy_name_prefix = "${var.name}-cloudtrail-to-cloudwatch"
-}
-
 data "aws_region" "current" {}
 data "aws_caller_identity" "current" {}
 data "aws_partition" "current" {}
@@ -26,7 +20,106 @@ data "aws_iam_session_context" "current" {
 ################################################################################
 #region
 
+locals {
+  s3_bucket_name        = coalesce(var.s3_bucket_name, "${var.name}-cloudtrail")
+  s3_bucket_name_prefix = coalesce(var.s3_bucket_name_prefix, "${var.name}-cloudtrail-")
+  bucket_policy         = coalesce(var.bucket_policy, data.aws_iam_policy_document.this.json)
 
+  # local.kms_master_key_id sets KMS encryption: uses custom config if provided, else defaults to module's key or specified kms_key_id, and is null if encryption is disabled.
+  kms_master_key_id = var.create_kms_key && length(var.kms_key_id) == 0 ? try(module.kms.key_id, null) : var.kms_key_id
+
+  # If enable_s3_bucket_server_side_encryption_configuration is true:
+  # - If a custom encryption configuration (var.s3_bucket_server_side_encryption_configuration) is provided and not empty, use this configuration.
+  # - Else, if local.kms_master_key_id is not null:
+  # - Set encryption to use AWS KMS with local.kms_master_key_id.
+  # - Else (if local.kms_master_key_id is null):
+  # - Do not set any encryption configuration (results in null).
+  # Else (if enable_s3_bucket_server_side_encryption_configuration is false):
+  # - Do not set any encryption configuration (results in null).
+  s3_bucket_server_side_encryption_configuration = var.enable_s3_bucket_server_side_encryption_configuration ? (
+    length(var.s3_bucket_server_side_encryption_configuration) > 0 ?
+    var.s3_bucket_server_side_encryption_configuration :
+    (local.kms_master_key_id != null ? <<-EOT
+    {
+      rule {
+        apply_server_side_encryption_by_default {
+          sse_algorithm     = "aws:kms"
+          kms_master_key_id = ${local.kms_master_key_id}
+        }
+      }
+    }
+    EOT
+    : null)
+  ) : null
+}
+
+data "aws_iam_policy_document" "this" {
+  count = var.create_s3_bucket ? 0 : 1
+  statement {
+    sid    = "AWSCloudTrailAclCheck"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudtrail.amazonaws.com"]
+    }
+
+    actions   = ["s3:GetBucketAcl"]
+    resources = [aws_s3_bucket.this[0].arn]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceArn"
+      values   = ["arn:${data.aws_partition.current.partition}:cloudtrail:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:trail/${var.name}"]
+    }
+  }
+
+  statement {
+    sid    = "AWSCloudTrailWrite"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudtrail.amazonaws.com"]
+    }
+
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.this[0].arn}/${var.s3_key_prefix}/AWSLogs/${data.aws_caller_identity.current.account_id}/*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "s3:x-amz-acl"
+      values   = ["bucket-owner-full-control"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceArn"
+      values   = ["arn:${data.aws_partition.current.partition}:cloudtrail:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:trail/${var.name}"]
+    }
+  }
+}
+
+module "s3_bucket" {
+  source = "git::https://github.com/terraform-aws-modules/terraform-aws-s3-bucket.git?ref=v3.8.2"
+
+  bucket        = var.s3_bucket_name_use_prefix ? null : local.s3_bucket_name
+  bucket_prefix = var.s3_bucket_name_use_prefix ? local.s3_bucket_name_prefix : null
+
+  attach_policy = var.attach_bucket_policy
+  policy        = local.bucket_policy
+
+  attach_public_policy                 = var.attach_public_bucket_policy
+  block_public_acls                    = var.block_public_acls
+  block_public_policy                  = var.block_public_policy
+  ignore_public_acls                   = var.ignore_public_acls
+  restrict_public_buckets              = var.restrict_public_buckets
+  versioning                           = var.s3_bucket_versioning
+  server_side_encryption_configuration = local.s3_bucket_server_side_encryption_configuration
+  lifecycle_rule                       = var.s3_bucket_lifecycle_rules
+
+  tags = var.tags
+}
 
 
 #endregion
@@ -126,7 +219,7 @@ module "cloudwatch_logs_group" {
 #endregion
 
 ################################################################################
-# Cloudtrail KMS Key
+# KMS Key
 ################################################################################
 #region
 locals {
@@ -285,40 +378,17 @@ module "kms" {
 # CloudTrail
 ################################################################################
 #region
-
-# resource "aws_cloudtrail" "this" {
-#   # checkov:skip=CKV_AWS_252: "Ensure CloudTrail defines an SNS Topic" -- SNS not currently needed
-#   name                       = var.name
-#   s3_key_prefix              = var.s3_key_prefix
-#   s3_bucket_name             = var.use_external_s3_bucket ? var.s3_bucket_name : aws_s3_bucket.this[0].id
-#   kms_key_id                 = data.aws_kms_key.this.arn
-#   is_multi_region_trail      = var.is_multi_region_trail
-#   enable_log_file_validation = true
-#   event_selector {
-#     read_write_type           = "All"
-#     include_management_events = true
-#   }
-#   cloud_watch_logs_group_arn = "${aws_cloudwatch_logs_group.this.arn}:*"
-#   cloud_watch_logs_role_arn  = aws_iam_role.cloudtrail_cloudwatch_role.arn
-#   tags                       = var.tags
-
-#   depends_on = [
-#     aws_s3_bucket_policy.this
-#   ]
-# }
-
-
 resource "aws_cloudtrail" "this" {
   # checkov:skip=CKV_AWS_252: "Ensure CloudTrail defines an SNS Topic"
   # checkov:skip=CKV2_AWS_10
   name                          = var.name
-  s3_bucket_name                = var.s3_bucket_name
+  s3_bucket_name                = coalesce(var.s3_bucket_name, module.s3_bucket.s3_bucket_id)
   include_global_service_events = var.include_global_service_events
   is_multi_region_trail         = var.is_multi_region_trail
   enable_log_file_validation    = var.enable_log_file_validation
-  cloud_watch_logs_role_arn     = var.cloud_watch_logs_role_arn
-  cloud_watch_logs_group_arn    = var.cloud_watch_logs_group_arn
-  kms_key_id                    = var.kms_key_id
+  cloud_watch_logs_role_arn     = coalesce(var.cloudwatch_logs_role_arn, aws_iam_role.cloudtrail_cloudwatch_role.arn)
+  cloud_watch_logs_group_arn    = coalesce(var.cloud_watch_logs_group_arn, "${module.cloudwatch_logs_group.cloudwatch_log_group_arn}:*") # CloudTrail requires the Log Stream wildcard
+  kms_key_id                    = coalesce(var.kms_key_id, module.kms.key_id)
   enable_logging                = var.enable_logging
   is_organization_trail         = var.is_organization_trail
   s3_key_prefix                 = var.s3_key_prefix

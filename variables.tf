@@ -1,15 +1,3 @@
-# variable "kms_key_id" {
-#   description = "KMS key ARN to use to encrypt the logs delivered by CloudTrail."
-#   type        = string
-# }
-
-# variable "log_retention_days" {
-#   description = "Number of days to retain logs."
-#   type        = number
-#   default     = 365
-# }
-
-
 ################################################################################
 # General
 ################################################################################
@@ -51,7 +39,7 @@ variable "s3_key_prefix" {
 variable "sns_topic_name" {
   description = "Name of the Amazon SNS topic defined for notification of log file delivery."
   type        = string
-  default     = ""
+  default     = null
 }
 
 variable "include_global_service_events" {
@@ -215,11 +203,121 @@ variable "create_s3_bucket" {
   default     = true
 }
 
+variable "s3_bucket_name_use_prefix" {
+  description = "Determines whether to use the CloudTrail name as a prefix for the S3 bucket name."
+  type        = bool
+  default     = true
+}
+
 variable "s3_bucket_name" {
   description = "The name of the existing S3 bucket to be used if 'create_s3_bucket' is set to false."
   type        = string
   default     = ""
 }
+
+variable "s3_bucket_name_prefix" {
+  description = "The prefix to use for the S3 bucket name."
+  type        = string
+  default     = ""
+}
+
+variable "attach_bucket_policy" {
+  description = "Controls if S3 bucket should have bucket policy attached (set to `true` to use value of `policy` as bucket policy)"
+  type        = bool
+  default     = false
+}
+
+variable "bucket_policy" {
+  description = "(Optional) A valid bucket policy JSON document. Note that if the policy document is not specific enough (but still valid), Terraform may view the policy as constantly changing in a terraform plan. In this case, please make sure you use the verbose/specific version of the policy. For more information about building AWS IAM policy documents with Terraform, see the AWS IAM Policy Document Guide."
+  type        = string
+  default     = null
+}
+
+variable "attach_public_bucket_policy" {
+  description = "Controls if S3 bucket should have public bucket policy attached (set to `true` to use value of `public_policy` as bucket policy)"
+  type        = bool
+  default     = true
+}
+
+variable "block_public_acls" {
+  description = "(Optional) Whether Amazon S3 should block public ACLs for this bucket. Defaults to true."
+  type        = bool
+  default     = true
+}
+
+variable "block_public_policy" {
+  description = "(Optional) Whether Amazon S3 should block public bucket policies for this bucket. Defaults to true."
+  type        = bool
+  default     = true
+
+}
+
+variable "ignore_public_acls" {
+  description = "(Optional) Whether Amazon S3 should ignore public ACLs for this bucket. Defaults to true."
+  type        = bool
+  default     = true
+}
+
+variable "restrict_public_buckets" {
+  description = "(Optional) Whether Amazon S3 should restrict public bucket policies for this bucket. Defaults to true."
+  type        = bool
+  default     = true
+}
+
+variable "s3_bucket_versioning" {
+  description = "Map containing versioning configuration."
+  type        = map(string)
+  default = {
+    enabled    = false
+    mfa_delete = false
+  }
+}
+
+variable "s3_bucket_server_side_encryption_configuration" {
+  description = "Map containing server-side encryption configuration."
+  type        = any
+  default     = {}
+}
+
+variable "enable_s3_bucket_server_side_encryption_configuration" {
+  description = "Whether to enable server-side encryption configuration."
+  type        = bool
+  default     = true
+}
+
+variable "s3_bucket_lifecycle_rules" {
+  description = "List of maps containing configuration of object lifecycle management."
+  type        = any
+  default = [
+    {
+      id                                     = "whatever"
+      status                                 = "Enabled"
+      abort_incomplete_multipart_upload_days = 7
+
+      #see https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html#sc-compare
+      # https://docs.aws.amazon.com/AmazonS3/latest/API/API_Transition.html
+      transition = [
+        {
+          days          = 30
+          storage_class = "STANDARD_IA"
+        },
+        {
+          days          = 60
+          storage_class = "GLACIER"
+        },
+        {
+          days          = 180
+          storage_class = "DEEP_ARCHIVE"
+        },
+      ]
+
+      expiration = {
+        days = 365
+      }
+    }
+  ]
+}
+
 #endregion
 
 ################################################################################
@@ -256,7 +354,7 @@ variable "cloudwatch_logs_group_arn" {
   default     = ""
 }
 
-variable "create_cloud_watch_logs_group" {
+variable "create_cloudwatch_logs_group" {
   description = "Determines whether to create a CloudWatch Log Group for CloudTrail logs. If not, an existing log group ARN must be provided."
   type        = bool
   default     = true
@@ -268,11 +366,6 @@ variable "cloud_watch_logs_group_arn" {
   default     = ""
 }
 
-variable "cloud_watch_logs_role_arn" {
-  description = "The ARN of the existing role that the CloudTrail will assume to write to CloudWatch logs. Should used If 'create_cloudtrail_iam_role' is set to false and you want to use CloudWatch logging."
-  type        = string
-  default     = ""
-}
 #endregion
 
 ################################################################################
