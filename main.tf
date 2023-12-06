@@ -105,6 +105,7 @@ module "s3_bucket" {
   versioning                           = var.s3_bucket_versioning
   server_side_encryption_configuration = local.s3_bucket_server_side_encryption_configuration
   lifecycle_rule                       = var.s3_bucket_lifecycle_rules
+  force_destroy                        = var.s3_bucket_force_destroy
 
   tags = var.tags
 }

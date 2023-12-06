@@ -23,8 +23,9 @@ module "cloudtrail" {
 
   name = local.cloudtrail_name
 
-  create_s3_bucket     = true
-  attach_bucket_policy = true
+  create_s3_bucket        = true
+  attach_bucket_policy    = true
+  s3_bucket_force_destroy = true
 
   create_cloudwatch_logs_group = true
   create_kms_key               = true
