@@ -347,27 +347,6 @@ locals {
     }
   ]
 
-  # key_statements = [
-  #   {
-  #     sid = "CloudWatchLogs"
-  #     actions = [
-  #       "kms:Encrypt*",
-  #       "kms:Decrypt*",
-  #       "kms:ReEncrypt*",
-  #       "kms:GenerateDataKey*",
-  #       "kms:Describe*"
-  #     ]
-  #     resources = ["*"]
-
-  #     principals = [
-  #       {
-  #         type        = "Service"
-  #         identifiers = ["logs.${data.aws_region.current.name}.amazonaws.com"]
-  #       }
-  #     ]
-  #   }
-  # ]
-
   kms_key_description    = try(coalesce(var.kms_key_description, "${var.name} cloudtrail encryption key"), null)
   kms_key_administrators = try(coalescelist(var.kms_key_administrators, [data.aws_iam_session_context.current.issuer_arn]), [])
   kms_key_users          = try(coalescelist(var.kms_key_users, [data.aws_iam_session_context.current.issuer_arn]), [])
