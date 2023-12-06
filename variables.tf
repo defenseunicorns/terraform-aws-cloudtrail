@@ -65,15 +65,16 @@ variable "event_selectors" {
     Specifies an event selector for enabling data event logging. Fields include include_management_events, read_write_type, exclude_management_event_sources, and data_resources.
     See: https://www.terraform.io/docs/providers/aws/r/cloudtrail.html for details on this variable and https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_EventSelector.html for details on the underlying API.
   EOT
-  type = list(object({
-    include_management_events        = bool
-    read_write_type                  = string
-    exclude_management_event_sources = list(string)
-    data_resources = list(object({
-      type   = string
-      values = list(string)
-    }))
-  }))
+  type        = any
+  # type = list(object({
+  #   include_management_events        = bool
+  #   read_write_type                  = string
+  #   exclude_management_event_sources = list(string)
+  #   data_resources = list(object({
+  #     type   = string
+  #     values = list(string)
+  #   }))
+  # }))
   default = []
 }
 
@@ -82,18 +83,19 @@ variable "advanced_event_selectors" {
   Specifies an advanced event selector for fine-grained event logging. Includes name and field_selectors.
   See: https://www.terraform.io/docs/providers/aws/r/cloudtrail.html for details on this variable and https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_EventSelector.html for details on the underlying API.
   EOT
-  type = list(object({
-    name = string
-    field_selectors = list(object({
-      field           = string
-      equals          = list(string)
-      not_equals      = list(string)
-      starts_with     = list(string)
-      ends_with       = list(string)
-      not_starts_with = list(string)
-      not_ends_with   = list(string)
-    }))
-  }))
+  type        = any
+  # type = list(object({
+  #   name = string
+  #   field_selectors = list(object({
+  #     field           = string
+  #     equals          = list(string)
+  #     not_equals      = list(string)
+  #     starts_with     = list(string)
+  #     ends_with       = list(string)
+  #     not_starts_with = list(string)
+  #     not_ends_with   = list(string)
+  #   }))
+  # }))
   default = []
 }
 
@@ -116,6 +118,12 @@ variable "create_kms_key" {
 
 variable "kms_key_id" {
   description = "The KMS key ID to use for encrypting CloudTrail logs."
+  type        = string
+  default     = ""
+}
+
+variable "kms_key_arn" {
+  description = "The KMS key ARN to use for encrypting CloudTrail logs."
   type        = string
   default     = ""
 }
@@ -186,7 +194,7 @@ variable "kms_key_aliases" {
   default     = []
 }
 
-variable "key_statements" {
+variable "kms_key_statements" {
   description = "A map of IAM policy [statements](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document#statement) for custom permission usage"
   type        = any
   default     = []
@@ -224,7 +232,7 @@ variable "s3_bucket_name_prefix" {
 variable "attach_bucket_policy" {
   description = "Controls if S3 bucket should have bucket policy attached (set to `true` to use value of `policy` as bucket policy)"
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "bucket_policy" {
@@ -348,22 +356,22 @@ variable "cloudwatch_logs_role_arn" {
   default     = ""
 }
 
-variable "cloudwatch_logs_group_arn" {
-  description = "The ARN of the CloudWatch Logs log group to which CloudTrail events will be delivered."
-  type        = string
-  default     = ""
-}
-
 variable "create_cloudwatch_logs_group" {
   description = "Determines whether to create a CloudWatch Log Group for CloudTrail logs. If not, an existing log group ARN must be provided."
   type        = bool
   default     = true
 }
 
-variable "cloud_watch_logs_group_arn" {
+variable "cloudwatch_logs_group_arn" {
   description = "The ARN of the existing CloudWatch Log Group to be used if 'create_cloudwatch_log_group' is set to false."
   type        = string
   default     = ""
+}
+
+variable "cloudwatch_logs_group_retention_in_days" {
+  description = "The number of days log events are kept in CloudWatch Logs. When an object expires, CloudWatch Logs automatically deletes it. If you don't specify a value, the default retention period is never expire."
+  type        = number
+  default     = 90
 }
 
 #endregion

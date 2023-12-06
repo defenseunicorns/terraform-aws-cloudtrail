@@ -21,40 +21,26 @@ data "aws_iam_session_context" "current" {
 #region
 
 locals {
-  s3_bucket_name        = coalesce(var.s3_bucket_name, "${var.name}-cloudtrail")
-  s3_bucket_name_prefix = coalesce(var.s3_bucket_name_prefix, "${var.name}-cloudtrail-")
-  bucket_policy         = coalesce(var.bucket_policy, data.aws_iam_policy_document.this.json)
+  s3_bucket_name        = try(coalesce(var.s3_bucket_name, "${var.name}-cloudtrail"), null)
+  s3_bucket_name_prefix = try(coalesce(var.s3_bucket_name_prefix, "${var.name}-cloudtrail-"), null)
+  bucket_policy         = try(coalesce(var.bucket_policy, data.aws_iam_policy_document.s3_bucket[0].json), null)
 
   # local.kms_master_key_id sets KMS encryption: uses custom config if provided, else defaults to module's key or specified kms_key_id, and is null if encryption is disabled.
-  kms_master_key_id = var.create_kms_key && length(var.kms_key_id) == 0 ? try(module.kms.key_id, null) : var.kms_key_id
-
-  # If enable_s3_bucket_server_side_encryption_configuration is true:
-  # - If a custom encryption configuration (var.s3_bucket_server_side_encryption_configuration) is provided and not empty, use this configuration.
-  # - Else, if local.kms_master_key_id is not null:
-  # - Set encryption to use AWS KMS with local.kms_master_key_id.
-  # - Else (if local.kms_master_key_id is null):
-  # - Do not set any encryption configuration (results in null).
-  # Else (if enable_s3_bucket_server_side_encryption_configuration is false):
-  # - Do not set any encryption configuration (results in null).
-  s3_bucket_server_side_encryption_configuration = var.enable_s3_bucket_server_side_encryption_configuration ? (
-    length(var.s3_bucket_server_side_encryption_configuration) > 0 ?
-    var.s3_bucket_server_side_encryption_configuration :
-    (local.kms_master_key_id != null ? <<-EOT
-    {
-      rule {
-        apply_server_side_encryption_by_default {
-          sse_algorithm     = "aws:kms"
-          kms_master_key_id = ${local.kms_master_key_id}
-        }
+  kms_master_key_id = var.create_kms_key ? module.kms.key_id : var.kms_key_id
+  default_encryption_configuration = {
+    rule = {
+      apply_server_side_encryption_by_default = {
+        sse_algorithm     = "aws:kms"
+        kms_master_key_id = local.kms_master_key_id
       }
     }
-    EOT
-    : null)
-  ) : null
+  }
+
+  s3_bucket_server_side_encryption_configuration = var.enable_s3_bucket_server_side_encryption_configuration ? coalesce(var.s3_bucket_server_side_encryption_configuration, local.default_encryption_configuration) : null
 }
 
-data "aws_iam_policy_document" "this" {
-  count = var.create_s3_bucket ? 0 : 1
+data "aws_iam_policy_document" "s3_bucket" {
+  count = var.create_s3_bucket ? 1 : 0
   statement {
     sid    = "AWSCloudTrailAclCheck"
     effect = "Allow"
@@ -65,7 +51,7 @@ data "aws_iam_policy_document" "this" {
     }
 
     actions   = ["s3:GetBucketAcl"]
-    resources = [aws_s3_bucket.this[0].arn]
+    resources = [module.s3_bucket.s3_bucket_arn]
 
     condition {
       test     = "StringEquals"
@@ -84,7 +70,7 @@ data "aws_iam_policy_document" "this" {
     }
 
     actions   = ["s3:PutObject"]
-    resources = ["${aws_s3_bucket.this[0].arn}/${var.s3_key_prefix}/AWSLogs/${data.aws_caller_identity.current.account_id}/*"]
+    resources = ["${module.s3_bucket.s3_bucket_arn}/${var.s3_key_prefix}/AWSLogs/${data.aws_caller_identity.current.account_id}/*"]
 
     condition {
       test     = "StringEquals"
@@ -102,6 +88,8 @@ data "aws_iam_policy_document" "this" {
 
 module "s3_bucket" {
   source = "git::https://github.com/terraform-aws-modules/terraform-aws-s3-bucket.git?ref=v3.8.2"
+
+  create_bucket = var.create_s3_bucket
 
   bucket        = var.s3_bucket_name_use_prefix ? null : local.s3_bucket_name
   bucket_prefix = var.s3_bucket_name_use_prefix ? local.s3_bucket_name_prefix : null
@@ -131,11 +119,11 @@ module "s3_bucket" {
 # This section is used for allowing CloudTrail to send logs to CloudWatch.
 
 locals {
-  cloudtrail_iam_role_name   = coalesce(var.cloudtrail_iam_role_name, "${var.name}-cloudtrail-to-cloudwatch")
-  cloudtrail_iam_policy_name = coalesce(var.cloudtrail_iam_policy_name, "${var.name}-cloudtrail-to-cloudwatch")
+  cloudtrail_iam_role_name   = try(coalesce(var.cloudtrail_iam_role_name, "${var.name}-cloudtrail-to-cloudwatch"), null)
+  cloudtrail_iam_policy_name = try(coalesce(var.cloudtrail_iam_policy_name, "${var.name}-cloudtrail-to-cloudwatch"), null)
 
-  cloudtrail_iam_role_name_prefix   = coalesce(var.cloudtrail_iam_role_name_prefix, "${var.name}-cloudtrail-role")
-  cloudtrail_iam_policy_name_prefix = coalesce(var.cloudtrail_iam_policy_name_prefix, "${var.name}-cloudtrail-policy")
+  cloudtrail_iam_role_name_prefix   = try(coalesce(var.cloudtrail_iam_role_name_prefix, "${var.name}-cloudtrail-role"), null)
+  cloudtrail_iam_policy_name_prefix = try(coalesce(var.cloudtrail_iam_policy_name_prefix, "${var.name}-cloudtrail-policy"), null)
 }
 
 # This policy allows the CloudTrail service for any account to assume this role.
@@ -159,7 +147,7 @@ resource "aws_iam_role" "cloudtrail_cloudwatch_role" {
 
   name               = var.cloudtrail_iam_role_name_use_prefix ? null : local.cloudtrail_iam_role_name
   name_prefix        = var.cloudtrail_iam_role_name_use_prefix ? local.cloudtrail_iam_role_name_prefix : null
-  assume_role_policy = data.aws_iam_policy_document.cloudtrail_assume_role.json
+  assume_role_policy = data.aws_iam_policy_document.cloudtrail_assume_role[0].json
 }
 
 data "aws_iam_policy_document" "cloudtrail_cloudwatch_logs" {
@@ -183,15 +171,15 @@ resource "aws_iam_policy" "cloudtrail_cloudwatch_logs" {
 
   name        = var.cloudtrail_iam_policy_name_use_prefix ? null : local.cloudtrail_iam_policy_name
   name_prefix = var.cloudtrail_iam_policy_name_use_prefix ? local.cloudtrail_iam_policy_name_prefix : null
-  policy      = data.aws_iam_policy_document.cloudtrail_cloudwatch_logs.json
+  policy      = data.aws_iam_policy_document.cloudtrail_cloudwatch_logs[0].json
 }
 
 resource "aws_iam_policy_attachment" "main" {
   count = var.create_cloudtrail_iam_role ? 1 : 0
 
   name       = "${var.cloudtrail_iam_policy_name}-attachment"
-  policy_arn = aws_iam_policy.cloudtrail_cloudwatch_logs.arn
-  roles      = [aws_iam_role.cloudtrail_cloudwatch_role.name]
+  policy_arn = aws_iam_policy.cloudtrail_cloudwatch_logs[0].arn
+  roles      = [aws_iam_role.cloudtrail_cloudwatch_role[0].name]
 }
 #endregion
 
@@ -200,8 +188,8 @@ resource "aws_iam_policy_attachment" "main" {
 ################################################################################
 #region
 locals {
-  cloudwatch_logs_group_name        = coalesce(var.cloudwatch_logs_group_name, "${var.name}-cloudtrail")
-  cloudwatch_logs_group_name_prefix = coalesce(var.cloudwatch_logs_group_name_prefix, "${var.name}-cloudtrail-")
+  cloudwatch_logs_group_name        = try(coalesce(var.cloudwatch_logs_group_name, "${var.name}-cloudtrail"), null)
+  cloudwatch_logs_group_name_prefix = try(coalesce(var.cloudwatch_logs_group_name_prefix, "${var.name}-cloudtrail-"), null)
 }
 
 module "cloudwatch_logs_group" {
@@ -212,7 +200,7 @@ module "cloudwatch_logs_group" {
   name              = var.cloudwatch_logs_group_use_name_prefix ? null : local.cloudwatch_logs_group_name
   name_prefix       = var.cloudwatch_logs_group_use_name_prefix ? local.cloudwatch_logs_group_name_prefix : null
   retention_in_days = var.cloudwatch_logs_group_retention_in_days
-  kms_key_id        = coalesce(var.kms_key_id, module.kms.key_id)
+  kms_key_id        = try(coalesce(var.kms_key_arn, module.kms.key_arn), "")
 
   tags = var.tags
 }
@@ -226,23 +214,27 @@ locals {
   # token from: https://docs.aws.amazon.com/awscloudtrail/latest/userguide/default-kms-key-policy.html and other sources
   key_statements = [
     {
-      sid     = "Enable IAM User Permissions"
-      effect  = "Allow"
-      actions = ["kms:*"]
-      principals = {
-        type        = "AWS"
-        identifiers = ["arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:root"]
-      }
+      sid       = "Enable IAM User Permissions"
+      effect    = "Allow"
+      actions   = ["kms:*"]
       resources = ["*"]
+      principals = [
+        {
+          type        = "AWS"
+          identifiers = ["arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:root"]
+        }
+      ]
     },
     {
       sid     = "Allow CloudTrail to encrypt logs"
       effect  = "Allow"
       actions = ["kms:GenerateDataKey*"]
-      principals = {
-        type        = "Service"
-        identifiers = ["cloudtrail.amazonaws.com"]
-      }
+      principals = [
+        {
+          type        = "Service"
+          identifiers = ["cloudtrail.amazonaws.com"]
+        }
+      ]
       resources = ["*"]
       condition = {
         test     = "StringLike"
@@ -254,20 +246,24 @@ locals {
       sid     = "Allow CloudTrail to describe key"
       effect  = "Allow"
       actions = ["kms:DescribeKey"]
-      principals = {
-        type        = "Service"
-        identifiers = ["cloudtrail.amazonaws.com"]
-      }
+      principals = [
+        {
+          type        = "Service"
+          identifiers = ["cloudtrail.amazonaws.com"]
+        }
+      ]
       resources = ["*"]
     },
     {
       sid     = "Allow principals in the account to decrypt log files"
       effect  = "Allow"
       actions = ["kms:Decrypt", "kms:ReEncryptFrom"]
-      principals = {
-        type        = "AWS"
-        identifiers = ["*"]
-      }
+      principals = [
+        {
+          type        = "AWS"
+          identifiers = ["*"]
+        }
+      ]
       resources = ["*"]
       condition = {
         test     = "StringEquals"
@@ -284,10 +280,12 @@ locals {
       sid     = "Allow alias creation during setup"
       effect  = "Allow"
       actions = ["kms:CreateAlias"]
-      principals = {
-        type        = "AWS"
-        identifiers = ["*"]
-      }
+      principals = [
+        {
+          type        = "AWS"
+          identifiers = ["*"]
+        }
+      ]
       condition = {
         test     = "StringEquals"
         variable = "kms:ViaService"
@@ -304,10 +302,12 @@ locals {
       sid     = "Enable cross account log decryption"
       effect  = "Allow"
       actions = ["kms:Decrypt", "kms:ReEncryptFrom"]
-      principals = {
-        type        = "AWS"
-        identifiers = ["*"]
-      }
+      principals = [
+        {
+          type        = "AWS"
+          identifiers = ["*"]
+        }
+      ]
       condition = {
         test     = "StringEquals"
         variable = "kms:CallerAccount"
@@ -323,32 +323,62 @@ locals {
     {
       sid    = "Allow logs KMS access"
       effect = "Allow"
-      principals = {
-        type        = "Service"
-        identifiers = ["logs.${data.aws_region.current.name}.amazonaws.com"]
-      }
+      principals = [
+        {
+          type        = "Service"
+          identifiers = ["logs.${data.aws_region.current.name}.amazonaws.com"]
+        }
+      ]
       actions   = ["kms:Encrypt*", "kms:Decrypt*", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:Describe*"]
       resources = ["*"]
     },
     {
       sid    = "Allow Cloudtrail to decrypt and generate key for sns access"
       effect = "Allow"
-      principals = {
-        type        = "Service"
-        identifiers = ["cloudtrail.amazonaws.com"]
-      }
+      principals = [
+        {
+          type        = "Service"
+          identifiers = ["cloudtrail.amazonaws.com"]
+        }
+      ]
       actions   = ["kms:Decrypt*", "kms:GenerateDataKey*"]
       resources = ["*"]
     }
   ]
+
+  # key_statements = [
+  #   {
+  #     sid = "CloudWatchLogs"
+  #     actions = [
+  #       "kms:Encrypt*",
+  #       "kms:Decrypt*",
+  #       "kms:ReEncrypt*",
+  #       "kms:GenerateDataKey*",
+  #       "kms:Describe*"
+  #     ]
+  #     resources = ["*"]
+
+  #     principals = [
+  #       {
+  #         type        = "Service"
+  #         identifiers = ["logs.${data.aws_region.current.name}.amazonaws.com"]
+  #       }
+  #     ]
+  #   }
+  # ]
+
+  kms_key_description    = try(coalesce(var.kms_key_description, "${var.name} cloudtrail encryption key"), null)
+  kms_key_administrators = try(coalescelist(var.kms_key_administrators, [data.aws_iam_session_context.current.issuer_arn]), [])
+  kms_key_users          = try(coalescelist(var.kms_key_users, [data.aws_iam_session_context.current.issuer_arn]), [])
+  kms_key_statements     = try(coalescelist(var.kms_key_statements, local.key_statements), [])
 }
 
 module "kms" {
   source = "git::https://github.com/terraform-aws-modules/terraform-aws-kms.git?ref=v2.1.0"
 
-  create = var.create_kms_key && length(var.kms_key_id) == 0
+  create = var.create_kms_key
 
-  description             = coalesce(var.kms_key_description, "${var.name} cloudtrail encryption key")
+  description             = local.kms_key_description
   key_usage               = "ENCRYPT_DECRYPT"
   deletion_window_in_days = var.kms_key_deletion_window_in_days
   enable_key_rotation     = var.enable_kms_key_rotation
@@ -356,12 +386,12 @@ module "kms" {
   # Policy
   enable_default_policy     = var.kms_key_enable_default_policy
   key_owners                = var.kms_key_owners
-  key_administrators        = coalescelist(var.kms_key_administrators, [data.aws_iam_session_context.current.issuer_arn])
-  key_users                 = coalescelist(var.kms_key_users, [data.aws_iam_session_context.current.issuer_arn])
+  key_administrators        = local.kms_key_administrators
+  key_users                 = local.kms_key_users
   key_service_users         = var.kms_key_service_users
   source_policy_documents   = var.kms_key_source_policy_documents
   override_policy_documents = var.kms_key_override_policy_documents
-  key_statements            = coalescelist(var.key_statements, local.key_statements)
+  key_statements            = local.kms_key_statements
 
   # Aliases
   aliases = var.kms_key_aliases
@@ -378,17 +408,25 @@ module "kms" {
 # CloudTrail
 ################################################################################
 #region
+
+locals {
+  cloudtrail_s3_bucket_name             = try(coalesce(var.s3_bucket_name, module.s3_bucket.s3_bucket_id), null)
+  cloudtrail_cloud_watch_logs_role_arn  = try(coalesce(var.cloudwatch_logs_role_arn, aws_iam_role.cloudtrail_cloudwatch_role[0].arn), null)
+  cloudtrail_cloud_watch_logs_group_arn = try(coalesce(var.cloudwatch_logs_group_arn, "${module.cloudwatch_logs_group.cloudwatch_log_group_arn}:*"), null) # CloudTrail requires the Log Stream wildcard
+  cloudtrail_kms_key_id                 = coalesce(var.kms_key_arn, module.kms.key_arn)
+}
+
 resource "aws_cloudtrail" "this" {
   # checkov:skip=CKV_AWS_252: "Ensure CloudTrail defines an SNS Topic"
   # checkov:skip=CKV2_AWS_10
   name                          = var.name
-  s3_bucket_name                = coalesce(var.s3_bucket_name, module.s3_bucket.s3_bucket_id)
+  s3_bucket_name                = local.cloudtrail_s3_bucket_name
   include_global_service_events = var.include_global_service_events
   is_multi_region_trail         = var.is_multi_region_trail
   enable_log_file_validation    = var.enable_log_file_validation
-  cloud_watch_logs_role_arn     = coalesce(var.cloudwatch_logs_role_arn, aws_iam_role.cloudtrail_cloudwatch_role.arn)
-  cloud_watch_logs_group_arn    = coalesce(var.cloud_watch_logs_group_arn, "${module.cloudwatch_logs_group.cloudwatch_log_group_arn}:*") # CloudTrail requires the Log Stream wildcard
-  kms_key_id                    = coalesce(var.kms_key_id, module.kms.key_id)
+  cloud_watch_logs_role_arn     = local.cloudtrail_cloud_watch_logs_role_arn
+  cloud_watch_logs_group_arn    = local.cloudtrail_cloud_watch_logs_group_arn
+  kms_key_id                    = local.cloudtrail_kms_key_id
   enable_logging                = var.enable_logging
   is_organization_trail         = var.is_organization_trail
   s3_key_prefix                 = var.s3_key_prefix
