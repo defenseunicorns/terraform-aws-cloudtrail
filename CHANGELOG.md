@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.2](https://github.com/defenseunicorns/terraform-aws-cloudtrail/compare/v0.0.1...v0.0.2) (2023-12-12)
+
+
+### Continuous Integration
+
+* debootstrap release-please ([#35](https://github.com/defenseunicorns/terraform-aws-cloudtrail/issues/35)) ([c73e4b8](https://github.com/defenseunicorns/terraform-aws-cloudtrail/commit/c73e4b8a0d086a60f244a9c4c855d35e014c1b21))
+
 ## 0.0.1 (2023-12-12)
 
 
