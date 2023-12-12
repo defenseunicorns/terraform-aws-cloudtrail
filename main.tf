@@ -376,8 +376,8 @@ module "kms" {
   # Aliases
   aliases = var.kms_key_aliases
   computed_aliases = {
-    # Computed since users can pass in computed values for cluster name such as random provider resources
-    cluster = { name = "cloudtrail/${var.name}" }
+    # Computed since users can pass in computed values for cloudtrail name such as random provider resources
+    cloudtrail = { name = "cloudtrail/${var.name}" }
   }
 
   tags = var.tags
@@ -411,7 +411,6 @@ resource "aws_cloudtrail" "this" {
   is_organization_trail         = var.is_organization_trail
   s3_key_prefix                 = var.s3_key_prefix
   sns_topic_name                = var.sns_topic_name
-  tags                          = var.tags
 
   dynamic "event_selector" {
     for_each = var.event_selectors
@@ -454,5 +453,7 @@ resource "aws_cloudtrail" "this" {
       insight_type = insight_selector.value
     }
   }
+
+  tags = var.tags
 }
 #endregion
