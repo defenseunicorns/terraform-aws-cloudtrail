@@ -393,7 +393,7 @@ locals {
   cloudtrail_s3_bucket_name             = try(coalesce(var.s3_bucket_name, module.s3_bucket.s3_bucket_id), null)
   cloudtrail_cloud_watch_logs_role_arn  = try(coalesce(var.cloudwatch_logs_role_arn, aws_iam_role.cloudtrail_cloudwatch_role[0].arn), null)
   cloudtrail_cloud_watch_logs_group_arn = try(coalesce(var.cloudwatch_logs_group_arn, "${module.cloudwatch_logs_group.cloudwatch_log_group_arn}:*"), null) # CloudTrail requires the Log Stream wildcard
-  cloudtrail_kms_key_id                 = coalesce(var.kms_key_arn, module.kms.key_arn)
+  cloudtrail_kms_key_id                 = try(coalesce(var.kms_key_arn, module.kms.key_arn))
 }
 
 resource "aws_cloudtrail" "this" {
