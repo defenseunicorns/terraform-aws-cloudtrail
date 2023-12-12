@@ -1,94 +1,73 @@
-terraform {
-  required_version = ">= 1.0.0"
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = ">= 4.62.0"
-    }
-  }
-}
-
-data "aws_region" "current" {}
-
-data "aws_caller_identity" "current" {}
-
 data "aws_partition" "current" {}
 
-data "aws_iam_policy_document" "kms_access" {
-  # checkov:skip=CKV_AWS_111: todo reduce perms on key
-  # checkov:skip=CKV_AWS_109: todo be more specific with resources
-  statement {
-    sid = "KMS Key Default"
-    principals {
-      type = "AWS"
-      identifiers = [
-        "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:root"
-      ]
-    }
-
-    actions = [
-      "kms:*",
-    ]
-
-    resources = ["*"]
-  }
-  statement {
-    sid = "CloudWatchLogsEncryption"
-    principals {
-      type        = "Service"
-      identifiers = ["logs.${data.aws_region.current.name}.amazonaws.com"]
-    }
-    actions = [
-      "kms:Encrypt*",
-      "kms:Decrypt*",
-      "kms:ReEncrypt*",
-      "kms:GenerateDataKey*",
-      "kms:Describe*",
-    ]
-
-    resources = ["*"]
-  }
-  statement {
-    sid = "Cloudtrail KMS permissions"
-    principals {
-      type = "Service"
-      identifiers = [
-        "cloudtrail.amazonaws.com"
-      ]
-    }
-    actions = [
-      "kms:Encrypt*",
-      "kms:Decrypt*",
-      "kms:ReEncrypt*",
-      "kms:GenerateDataKey*",
-      "kms:Describe*",
-    ]
-    resources = ["*"]
-  }
+resource "random_id" "default" {
+  byte_length = 2
 }
 
-resource "aws_kms_key" "default" {
-  description             = "SSM Key"
-  deletion_window_in_days = 7
-  enable_key_rotation     = true
-  policy                  = data.aws_iam_policy_document.kms_access.json
-  multi_region            = true
-}
 
-resource "aws_kms_alias" "default" {
-  name_prefix   = "alias/${var.name}"
-  target_key_id = aws_kms_key.default.key_id
+locals {
+  # Add randomness to names to avoid collisions when multiple users are using this example
+  cloudtrail_name = "${var.name_prefix}${lower(random_id.default.hex)}"
+  tags = merge(
+    var.tags,
+    {
+      RootTFModule = replace(basename(path.cwd), "_", "-") # tag names based on the directory name
+      ManagedBy    = "Terraform"
+      Repo         = "https://github.com/defenseunicorns/terraform-aws-cloudtrail"
+    }
+  )
 }
 
 module "cloudtrail" {
-  source                 = "../.."
-  name                   = var.name
-  kms_key_id             = aws_kms_key.default.id
-  use_external_s3_bucket = var.use_external_s3_bucket
-  s3_bucket_name         = var.s3_bucket_name
+  source = "../.."
 
-  depends_on = [
-    aws_kms_key.default,
-    aws_kms_alias.default
+  name = local.cloudtrail_name
+
+  create_s3_bucket        = true
+  attach_bucket_policy    = true
+  s3_bucket_force_destroy = true
+
+  create_cloudwatch_logs_group = true
+  create_kms_key               = true
+
+  # see https://docs.aws.amazon.com/awscloudtrail/latest/userguide/logging-data-events-with-cloudtrail.html
+  event_selectors = [
+    {
+      # Include management events to capture all actions performed by AWS Management Console, AWS SDKs, command line tools, and other AWS services
+      include_management_events = true
+
+      # Capture both Read and Write API calls
+      read_write_type = "All"
+
+      # Exclude events from KMS service
+      exclude_management_event_sources = ["kms.amazonaws.com"]
+
+      data_resources = [
+        # Logging Individual S3 Bucket Events By Using Basic Event Selectors
+        {
+          # Specify the type of data resource
+          type = "AWS::S3::Object"
+
+          # Specify the ARN of the S3 bucket and prefix
+          values = ["arn:${data.aws_partition.current.partition}:s3:::terraform-state/"]
+        },
+      ]
+    },
+    {
+      include_management_events = true
+      read_write_type           = "All"
+
+      data_resources = [
+        {
+          type = "AWS::Lambda::Function"
+          # Logging Data Events for all Lambda Functions in the Account
+          values = ["arn:${data.aws_partition.current.partition}:lambda"]
+        }
+      ]
+    }
   ]
+
+  # Enable insights for API call rate and API error rate
+  insight_selectors = ["ApiCallRateInsight", "ApiErrorRateInsight"]
+  tags              = local.tags
 }
