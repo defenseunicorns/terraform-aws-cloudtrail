@@ -87,7 +87,7 @@ data "aws_iam_policy_document" "s3_bucket" {
 }
 
 module "s3_bucket" {
-  source = "git::https://github.com/terraform-aws-modules/terraform-aws-s3-bucket.git?ref=v3.8.2"
+  source = "git::https://github.com/terraform-aws-modules/terraform-aws-s3-bucket.git?ref=v4.0.1"
 
   create_bucket = var.create_s3_bucket
 
@@ -194,7 +194,7 @@ locals {
 }
 
 module "cloudwatch_logs_group" {
-  source = "git::https://github.com/terraform-aws-modules/terraform-aws-cloudwatch.git//modules/log-group?ref=v4.3.0"
+  source = "git::https://github.com/terraform-aws-modules/terraform-aws-cloudwatch.git//modules/log-group?ref=v5.1.0"
 
   create = var.create_cloudwatch_logs_group && length(var.cloudwatch_logs_group_arn) == 0
 
