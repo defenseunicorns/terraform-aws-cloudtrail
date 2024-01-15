@@ -27,9 +27,9 @@ Terraform module to provision [CloudTrail](https://aws.amazon.com/cloudtrail/) o
 
 | Name | Source | Version |
 |------|--------|---------|
-| <a name="module_cloudwatch_logs_group"></a> [cloudwatch\_logs\_group](#module\_cloudwatch\_logs\_group) | git::https://github.com/terraform-aws-modules/terraform-aws-cloudwatch.git//modules/log-group | v4.3.0 |
+| <a name="module_cloudwatch_logs_group"></a> [cloudwatch\_logs\_group](#module\_cloudwatch\_logs\_group) | git::https://github.com/terraform-aws-modules/terraform-aws-cloudwatch.git//modules/log-group | v5.1.0 |
 | <a name="module_kms"></a> [kms](#module\_kms) | git::https://github.com/terraform-aws-modules/terraform-aws-kms.git | v2.1.0 |
-| <a name="module_s3_bucket"></a> [s3\_bucket](#module\_s3\_bucket) | git::https://github.com/terraform-aws-modules/terraform-aws-s3-bucket.git | v3.8.2 |
+| <a name="module_s3_bucket"></a> [s3\_bucket](#module\_s3\_bucket) | git::https://github.com/terraform-aws-modules/terraform-aws-s3-bucket.git | v4.0.1 |
 
 ## Resources
 
