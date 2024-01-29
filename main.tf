@@ -87,7 +87,7 @@ data "aws_iam_policy_document" "s3_bucket" {
 }
 
 module "s3_bucket" {
-  source = "git::https://github.com/terraform-aws-modules/terraform-aws-s3-bucket.git?ref=v4.0.1"
+  source = "git::https://github.com/terraform-aws-modules/terraform-aws-s3-bucket.git?ref=v4.1.0"
 
   create_bucket = var.create_s3_bucket
 
