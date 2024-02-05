@@ -354,7 +354,7 @@ locals {
 }
 
 module "kms" {
-  source = "git::https://github.com/terraform-aws-modules/terraform-aws-kms.git?ref=v2.1.0"
+  source = "git::https://github.com/terraform-aws-modules/terraform-aws-kms.git?ref=v2.2.0"
 
   create = var.create_kms_key
 
