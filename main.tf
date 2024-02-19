@@ -194,7 +194,7 @@ locals {
 }
 
 module "cloudwatch_logs_group" {
-  source = "git::https://github.com/terraform-aws-modules/terraform-aws-cloudwatch.git//modules/log-group?ref=v5.1.0"
+  source = "git::https://github.com/terraform-aws-modules/terraform-aws-cloudwatch.git//modules/log-group?ref=v5.2.0"
 
   create = var.create_cloudwatch_logs_group && length(var.cloudwatch_logs_group_arn) == 0
 
