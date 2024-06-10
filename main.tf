@@ -175,12 +175,11 @@ resource "aws_iam_policy" "cloudtrail_cloudwatch_logs" {
   policy      = data.aws_iam_policy_document.cloudtrail_cloudwatch_logs[0].json
 }
 
-resource "aws_iam_policy_attachment" "main" {
+resource "aws_iam_role_policy_attachment" "main" {
   count = var.create_cloudtrail_iam_role ? 1 : 0
 
-  name       = "${var.cloudtrail_iam_policy_name}-attachment"
   policy_arn = aws_iam_policy.cloudtrail_cloudwatch_logs[0].arn
-  roles      = [aws_iam_role.cloudtrail_cloudwatch_role[0].name]
+  role       = aws_iam_role.cloudtrail_cloudwatch_role[0].name
 }
 #endregion
 
