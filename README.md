@@ -9,7 +9,7 @@ Terraform module to provision [CloudTrail](https://aws.amazon.com/cloudtrail/) o
 * Provides the choice for the user to either provide an S3 bucket or create a new one with sensible defaults.
 * Simplifies the creation of the CloudTrail by using opinionated configuration. If you need more customizability please open an issue so we can add it.
 
-<!-- BEGINNING OF PRE-COMMIT-TERRAFORM DOCS HOOK -->
+<!-- BEGINNING OF PRE-COMMIT-OPENTOFU DOCS HOOK -->
 ## Requirements
 
 | Name | Version |
@@ -121,4 +121,4 @@ Terraform module to provision [CloudTrail](https://aws.amazon.com/cloudtrail/) o
 | <a name="output_s3_bucket_arn"></a> [s3\_bucket\_arn](#output\_s3\_bucket\_arn) | The ARN of the bucket. |
 | <a name="output_s3_bucket_id"></a> [s3\_bucket\_id](#output\_s3\_bucket\_id) | The name of the bucket. |
 | <a name="output_s3_bucket_region"></a> [s3\_bucket\_region](#output\_s3\_bucket\_region) | The AWS region this bucket resides in. |
-<!-- END OF PRE-COMMIT-TERRAFORM DOCS HOOK -->
+<!-- END OF PRE-COMMIT-OPENTOFU DOCS HOOK -->
